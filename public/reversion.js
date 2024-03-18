@@ -3,6 +3,10 @@ const gridSize = 512;
 const subGridSize = 32;
 const blockSplit = 210000;
 
+let pause = false;
+let recording = false;
+let recordedChunks = [];
+
 const numberOfSubGridsPerRow = gridSize / subGridSize;
 
 const subTiles = [{
@@ -29,7 +33,7 @@ let grid = Array.from({ length: gridSize }, () => Array(gridSize).fill({
 }));
 
 const styleColors = [
-  "#FFC0CB", // Style 0: Classic Red
+  "#FFC0CB", // Style 0: Light Red
   "#FFA500", // Style 1: Bright Orange
   "#FFFF00", // Style 2: Vivid Yellow
   "#00FF00", // Style 3: Lime Green
@@ -37,11 +41,11 @@ const styleColors = [
   "#0000FF", // Style 5: Deep Blue
   "#4B0082", // Style 6: Indigo
   "#EE82EE", // Style 7: Violet
-  "#FFC0CB", // Style 8: Soft Pink
+  "#FF69B4", // Style 8: Hot Pink
   "#00FF7F", // Style 9: Bright Green
   "#008080", // Style 10: Teal
   "#808000", // Style 11: Olive Green
-  "#FF0000", // Style 12: Red
+  "#FF0000", // Style 12: Classic Red
   "#708090", // Style 13: Slate Gray
   "#191970"  // Style 14: Midnight Blue
 ];
@@ -345,7 +349,55 @@ function promiseReturns(urls) {
   }));
 }
 
-async function createLife(canvas, tileIndex) {
+async function createLife(canvas, tileIndex, ticks) {
+  const stream = canvas.captureStream(60);
+  const mimeType = !MediaRecorder.isTypeSupported('video/mp4') ? 'video/webm' : 'video/mp4';
+  const mediaRecorder = new MediaRecorder(stream, { mimeType });
+
+  mediaRecorder.ondataavailable = function(event) {
+    if (event.data.size > 0) {
+      recordedChunks.push(event.data);
+    }
+  };
+
+  mediaRecorder.onstop = function() {
+    var blob = new Blob(recordedChunks, { type: mimeType });
+    var url = URL.createObjectURL(blob);
+    var downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = `${tileIndex}-reversion.webm`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
+
+  document.body.addEventListener("keydown", function (event) {
+    if (event.code === 'Space') {
+      pause = !pause;
+    }
+
+    if (event.code === 'KeyP') {
+      let dataURL = canvas.toDataURL('image/png');
+      let downloadLink = document.createElement('a');
+      downloadLink.href = dataURL;
+      downloadLink.download = `${tileIndex}-reversion.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+
+    if (event.code === 'KeyS') {
+      if (!recording) {
+        recordedChunks = [];
+        mediaRecorder.start();
+      } else {
+        mediaRecorder.stop();
+      }
+
+      recording = !recording;
+    }
+  }, false);
+
   const ctx = canvas.getContext('2d');
   ctx.strokeStyle = 'black';
   ctx.textAlign = 'center';
@@ -373,17 +425,18 @@ async function createLife(canvas, tileIndex) {
 
     let blockDiff = blockHeight - lastEpoch;
 
-    window.block = blockDiff;
+    window.block = lastEpoch;
+    window.blockDiff = blockDiff;
 
     const [newHash] = await promiseReturns([`https://ordinals.com/r/blockhash/${lastEpoch}`]);
 
     generateStartingGrid(newHash);
 
-    const animationInterval = 600;
+    const animationInterval = ticks || 300;
 
     function startAnimation() {
       setInterval(function () {
-        if (blockDiff) {
+        if (blockDiff && !pause) {
           if (cellSize < 2) {
             simulateStepsAndUpdateGrid(1, tile.startX, tile.startY, defaultGridSize, defaultGridSize, canvas.height, ctx);
           } else {
@@ -392,8 +445,8 @@ async function createLife(canvas, tileIndex) {
 
           blockDiff--;
           window.block++;
+          window.blockDiff = blockDiff;
         }
-
       }, animationInterval);
     }
 

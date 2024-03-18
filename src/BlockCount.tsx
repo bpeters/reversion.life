@@ -1,30 +1,32 @@
-import { Box, Grid, Text } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
+import accounting from "accounting";
 
 declare global {
   interface Window {
     block: any;
+    blockDiff: any;
   }
 }
 
 export const BlockCount = () => {
   const loadedRef = useRef(false);
-  const [count, setCount] = useState<number | null>(null);
+  const [count, setCount] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loadedRef.current) {
       loadedRef.current = true;
 
       setInterval(() => {
-        setCount(window.block);
-      }, 300);
+        setCount(`${accounting.formatNumber(window.block)}`);
+      }, 100);
     }
   }, []);
 
   return (
     <>
       <Text
-        fontSize={'24px'}
+        fontSize={'18px'}
         color={'#EE82EE'}
         paddingLeft="14px"
       >
@@ -32,12 +34,12 @@ export const BlockCount = () => {
       </Text>
       <Text
         color={'#F7931A'}
-        fontSize={'20px'}
+        fontSize={'16px'}
       >
         {count || 'life'}
       </Text>
       <Text
-        fontSize={'24px'}
+        fontSize={'18px'}
         color={'#EE82EE'}
       >
         ]
